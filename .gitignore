@@ -1,0 +1,27 @@
+# Virtual environment
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+
+# Local session and auth caches (NEVER commit or share)
+tidal_session.json
+.spotify_cache
+.env
+.env.local
+*.env
+
+# Logs and temp files
+*.log
+scratch/
+.system_generated/
+*.tmp
+
+# Uploaded playlist files or exports
+*.csv
+*.tsv
+*.xlsx
+*.txt
+!requirements.txt

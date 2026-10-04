@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spotify ➔ TIDAL Pro | Traslado Inteligente de Playlists</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-badge">
+        <span>SPOTIFY</span> ➔ <span>TIDAL</span> MIGRATOR PRO
+      </div>
+      <h1 class="app-title">
+        Traslada tus Playlists a <span class="td-txt">TIDAL</span>
+      </h1>
+      <p class="app-subtitle">
+        Rápido, sencillo y directo. Conecta TIDAL en 1 clic y carga tus listas de Spotify sin claves de desarrollador.
+      </p>
+    </header>
+
+    <!-- Services Connection Grid -->
+    <section class="services-grid">
+      
+      <!-- Spotify Card -->
+      <div class="service-card spotify-card" id="spotifyCard">
+        <div class="card-top">
+          <div class="service-brand">
+            <svg viewBox="0 0 24 24" fill="#1db954">
+              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+            </svg>
+            <span class="service-name">Spotify</span>
+          </div>
+          <div class="status-badge connected" id="spotifyStatusBadge">
+            <span class="dot"></span>
+            <span id="spotifyStatusText">Listo</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 1.2rem;">
+          <label style="display:block; font-size:0.85rem; font-weight:600; color:var(--text-muted); margin-bottom:0.4rem;">
+            Pega el enlace de tu playlist o perfil de Spotify:
+          </label>
+          <div style="display:flex; gap: 0.5rem;">
+            <input type="text" id="quickSpotifyUrlInput" class="form-input" style="padding: 0.6rem 0.8rem; font-size: 0.875rem;" placeholder="https://open.spotify.com/playlist/... o usuario">
+            <button class="btn btn-spotify" id="btnQuickLoadSpotify" style="white-space:nowrap; padding: 0.6rem 1.1rem;">
+              Cargar
+            </button>
+          </div>
+          <p class="help-text" style="margin-top:0.4rem;">
+            Sin crear cuentas de desarrollador. Pega el enlace de cualquier playlist o tu perfil.
+          </p>
+          <div style="background: rgba(29, 185, 84, 0.08); border: 1px solid rgba(29, 185, 84, 0.2); border-radius: 8px; padding: 0.6rem; margin-top: 0.6rem; font-size: 0.78rem; color: #a7f3d0; line-height: 1.4;">
+            💡 <strong>¿Buscas "Mis pistas de Shazam" o alguna lista específica?</strong> En Spotify abre tu lista, haz clic en <code>...</code> ➔ <strong>Compartir</strong> ➔ <strong>Copiar enlace</strong> y pégalo aquí. ¡O dale a <em>"Añadir al perfil"</em> en Spotify para que siempre aparezca en tu perfil!
+          </div>
+        </div>
+
+
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:space-between; align-items:center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.8rem;">
+          <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm" id="btnOpenMultiUrlModal" style="font-size:0.82rem; padding: 0.4rem 0.8rem;">
+              📋 Múltiples enlaces
+            </button>
+            <label class="btn btn-ghost btn-sm" style="font-size:0.82rem; padding: 0.4rem 0.8rem; cursor:pointer;">
+              📁 Subir archivo (CSV)
+              <input type="file" id="filePlaylistInput" accept=".csv,.txt" style="display:none;">
+            </label>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="btnSpotifyConfig" style="font-size:0.75rem; color:var(--text-dim); padding:0.3rem 0.6rem;" title="Opcional: Modo Desarrollador con API Keys">
+            ⚙ Modo Desarrollador (Opcional)
+          </button>
+        </div>
+      </div>
+
+
+      <!-- Center Connector -->
+      <div class="service-connector">
+        <div class="connector-pulse">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Tidal Card -->
+      <div class="service-card tidal-card" id="tidalCard">
+        <div class="card-top">
+          <div class="service-brand">
+            <svg viewBox="0 0 24 24" fill="#00e5ff">
+              <path d="M12.012 3.992L8.008 7.996 4.004 3.992 0 7.996l4.004 4.004 4.004-4.004 4.004 4.004 4.004-4.004L12.012 3.992zm7.984 0l-4.004 4.004 4.004 4.004 4.004-4.004-4.004-4.004zm-7.984 8.008l-4.004 4.004 4.004 4.004 4.004-4.004-4.004-4.004z"/>
+            </svg>
+            <span class="service-name">TIDAL</span>
+          </div>
+          <div class="status-badge disconnected" id="tidalStatusBadge">
+            <span class="dot"></span>
+            <span id="tidalStatusText">Desconectado</span>
+          </div>
+        </div>
+
+        <div class="service-profile" id="tidalProfile">
+          <div class="profile-avatar" id="tidalAvatar">TD</div>
+          <div class="profile-info">
+            <h4 id="tidalUserName">No conectado</h4>
+            <p id="tidalMetaText">Conexión oficial en 1 clic sin claves de desarrollador</p>
+          </div>
+        </div>
+
+        <div class="service-actions">
+          <button class="btn btn-tidal" id="btnConnectTidal" style="width: 100%;">
+            Conectar TIDAL en 1 Clic
+          </button>
+          <button class="btn btn-danger hidden" id="btnTidalLogout" style="display:none;">Desconectar</button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Playlists Section -->
+    <section class="playlists-section" id="playlistsSection">
+      <div class="section-header">
+        <div class="section-title">
+          <h2>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18V5l12-2v13"></path>
+              <circle cx="6" cy="18" r="3"></circle>
+              <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+            Playlists Listas para Transferir
+          </h2>
+          <p id="playlistsSubtitle">Pega el enlace de tus playlists de Spotify arriba para agregarlas a la lista.</p>
+        </div>
+
+        <div class="search-box">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="searchInput" placeholder="Buscar en playlists...">
+        </div>
+      </div>
+
+      <!-- Control / Filter Bar -->
+      <div class="control-bar" id="controlBar">
+        <div class="selection-actions">
+          <button class="btn btn-ghost" id="btnSelectAll">Seleccionar Todo</button>
+          <button class="btn btn-ghost" id="btnDeselectAll">Deseleccionar</button>
+          <span class="selection-count" id="selectionCount">0 seleccionadas</span>
+        </div>
+
+        <div class="transfer-settings">
+          <div class="prefix-input-wrap">
+            <label for="prefixInput">Prefijo en Tidal:</label>
+            <input type="text" id="prefixInput" placeholder="Ej: [Spotify]">
+          </div>
+        </div>
+      </div>
+
+      <!-- Playlists Grid Container -->
+      <div class="playlists-grid" id="playlistsGrid">
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M8 12h8"></path>
+            <path d="M12 8v8"></path>
+          </svg>
+          <p>Aún no has agregado ninguna playlist. Pega un enlace arriba para cargar tus canciones al instante.</p>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <!-- Bottom Floating Action Dock -->
+  <div class="bottom-dock hidden" id="bottomDock">
+    <div id="dockInfo">
+      <strong id="dockCount">0 playlists seleccionadas</strong>
+    </div>
+    <button class="btn btn-tidal btn-lg" id="btnStartTransfer">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+      </svg>
+      Iniciar Transferencia a TIDAL
+    </button>
+  </div>
+
+  <!-- Live Transfer Overlay / Progress Modal -->
+  <div class="transfer-overlay hidden" id="transferOverlay">
+    <div class="transfer-modal">
+      <div class="transfer-modal-header">
+        <div style="display:flex; align-items:center; gap: 0.75rem;">
+          <div class="equalizer-anim" id="eqAnim">
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+          </div>
+          <h3 id="transferModalTitle">Migrando Playlists a TIDAL...</h3>
+        </div>
+        <button class="btn btn-danger btn-sm" id="btnCancelTransfer">Detener</button>
+      </div>
+
+      <!-- Playlists Overall Progress -->
+      <div class="progress-block">
+        <div class="progress-header">
+          <span id="plProgressLabel">Playlists: 0 / 0</span>
+          <span id="plPercentLabel">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="plProgressBar"></div>
+        </div>
+      </div>
+
+      <!-- Tracks Progress -->
+      <div class="progress-block">
+        <div class="progress-header">
+          <span id="trackProgressLabel">Canciones: 0 procesadas</span>
+          <span id="matchStatsLabel" style="color: var(--tidal-cyan)">0 emparejadas</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="trackProgressBar"></div>
+        </div>
+      </div>
+
+      <!-- Current Track Ticker -->
+      <div class="current-track-ticker">
+        <div class="ticker-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 18V5l12-2v13"></path>
+            <circle cx="6" cy="18" r="3"></circle>
+            <circle cx="18" cy="16" r="3"></circle>
+          </svg>
+        </div>
+        <div class="ticker-info">
+          <h5 id="tickerSong">Preparando migración...</h5>
+          <p id="tickerArtist">Buscando la mejor versión en Tidal...</p>
+        </div>
+      </div>
+
+      <!-- Live Log Feed -->
+      <div class="event-feed-wrap" id="eventFeed">
+        <div class="feed-item" style="color: var(--text-dim)">
+          <span>Conectando con el motor de transferencia...</span>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn btn-ghost" id="btnViewReport" style="display:none;">Ver reporte de canciones</button>
+        <button class="btn btn-primary" id="btnCloseTransferModal" style="display:none; margin-left:auto;">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: TIDAL 1-Click Device Authorization -->
+  <dialog class="modal-dialog" id="tidalAuthModal">
+    <div class="modal-header">
+      <h3>Vincular tu cuenta TIDAL</h3>
+      <button class="btn-close" id="btnCloseTidalAuth">&times;</button>
+    </div>
+
+    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+      TIDAL utiliza inicio de sesión oficial por dispositivo. No requieres claves técnicas ni API keys:
+    </p>
+
+    <div class="help-box" style="text-align:center;">
+      <p style="margin-bottom: 0.5rem; font-size:0.85rem;">Código de autorización:</p>
+      <div class="code-display" id="tidalCodeDisplay">CARGANDO...</div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom: 1rem;">
+        Haz clic en el botón para abrir TIDAL en tu navegador y confirmar el acceso:
+      </p>
+      <a href="#" target="_blank" rel="noopener noreferrer" id="btnOpenTidalLink" class="btn btn-tidal btn-lg" style="width: 100%; text-decoration:none; margin-bottom: 0.75rem;">
+        Abrir TIDAL y Autorizar
+      </a>
+
+      <button type="button" class="btn btn-ghost" id="btnVerifyTidalNow" style="width: 100%; font-size: 0.88rem; margin-bottom: 0.75rem;">
+        🔄 Ya confirmé en TIDAL (Comprobar ahora)
+      </button>
+
+      <div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted); word-break: break-all;">
+        O copia y abre este enlace: <br>
+        <a id="tidalDirectLinkText" href="#" target="_blank" rel="noopener noreferrer" style="color:var(--tidal-cyan); text-decoration:underline;"></a>
+      </div>
+
+      <div style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.6rem; margin-top: 0.75rem; font-size: 0.78rem; color: var(--text-dim); text-align: left;">
+        💡 <strong>Tip antibloqueo:</strong> Si tu navegador muestra un aviso de seguridad o Cloudflare, copia el enlace y ábrelo en el navegador de tu <strong>teléfono móvil</strong> o en una <strong>ventana de incógnito</strong>. Al autorizarlo allí, tu PC se conectará automáticamente.
+      </div>
+    </div>
+
+    <div style="display: flex; align-items:center; justify-content: center; gap: 0.5rem; font-size: 0.85rem; color: var(--tidal-cyan)">
+      <div class="eq-bar" style="height:12px"></div>
+      <span>Esperando confirmación...</span>
+    </div>
+  </dialog>
+
+
+  <!-- Modal: Multi-URL Paste -->
+  <dialog class="modal-dialog" id="multiUrlModal" style="max-width: 560px;">
+    <div class="modal-header">
+      <h3>Cargar Múltiples Playlists</h3>
+      <button class="btn-close" id="btnCloseMultiUrl">&times;</button>
+    </div>
+    <form id="multiUrlForm">
+      <div class="form-group">
+        <label for="multiUrlTextarea">Pega los enlaces (uno por línea o separados por comas):</label>
+        <textarea id="multiUrlTextarea" class="form-input" style="height: 140px; resize: vertical; font-family:var(--font-mono); font-size:0.82rem;" placeholder="https://open.spotify.com/playlist/...&#10;https://open.spotify.com/playlist/...&#10;https://open.spotify.com/user/tu_usuario"></textarea>
+        <p class="help-text">Puedes pegar enlaces de playlists individuales o la URL de tu perfil de Spotify.</p>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+        <button type="button" class="btn btn-ghost" id="btnCancelMultiUrl">Cancelar</button>
+        <button type="submit" class="btn btn-spotify" id="btnSubmitMultiUrl">Cargar Playlists</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: Optional Spotify Developer Credentials Setup -->
+  <dialog class="modal-dialog" id="spotifyConfigModal">
+    <div class="modal-header">
+      <h3>Configuración de Spotify API (Opcional)</h3>
+      <button class="btn-close" id="btnCloseSpotifyConfig">&times;</button>
+    </div>
+    
+    <div class="help-box">
+      <strong>Modo Avanzado Opcional:</strong>
+      <p style="margin-top:0.3rem; font-size:0.82rem;">Si deseas sincronizar automáticamente todas las playlists privadas de tu biblioteca mediante la API de Spotify, puedes configurar tus claves aquí.</p>
+      <ol style="margin-left: 1.2rem; margin-top: 0.5rem; font-size:0.82rem;">
+        <li>Entra en <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">Spotify Developer Dashboard</a>.</li>
+        <li>Crea una app y en Redirect URI coloca: <br><code style="color:var(--tidal-cyan)">http://127.0.0.1:8000/api/spotify/callback</code></li>
+        <li>Copia tu Client ID y Secret abajo:</li>
+      </ol>
+    </div>
+
+    <form id="spotifyConfigForm">
+      <div class="form-group">
+        <label for="clientIdInput">Client ID:</label>
+        <input type="text" class="form-input" id="clientIdInput" placeholder="Ingresa tu Client ID">
+      </div>
+      <div class="form-group">
+        <label for="clientSecretInput">Client Secret:</label>
+        <input type="password" class="form-input" id="clientSecretInput" placeholder="Ingresa tu Client Secret">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+        <button type="button" class="btn btn-ghost" id="btnCancelSpotifyConfig">Cancelar</button>
+        <button type="submit" class="btn btn-spotify">Guardar y Conectar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: Missing Tracks Report -->
+  <dialog class="modal-dialog" id="reportModal" style="max-width: 600px;">
+    <div class="modal-header">
+      <h3>Reporte de Canciones No Encontradas</h3>
+      <button class="btn-close" id="btnCloseReport">&times;</button>
+    </div>
+    <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">
+      Las siguientes pistas no pudieron ser localizadas en el catálogo de TIDAL o están restringidas por región:
+    </p>
+    <div class="event-feed-wrap" id="reportList" style="height: 250px;">
+      <!-- Populated via JS -->
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1rem;">
+      <button class="btn btn-ghost" id="btnCopyReport">Copiar lista al portapapeles</button>
+      <button class="btn btn-primary" id="btnDoneReport">Aceptar</button>
+    </div>
+  </dialog>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
