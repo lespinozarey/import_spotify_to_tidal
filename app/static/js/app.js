@@ -2,6 +2,8 @@
 const state = {
   spotify: { configured: false, authenticated: false, profile: null },
   tidal: { authenticated: false, profile: null },
+  ytmusic: { authenticated: false, profile: null },
+  destination: 'tidal',
   playlists: [],
   selectedPlaylistIds: new Set(),
   filterQuery: '',
@@ -29,6 +31,15 @@ const el = {
   btnConnectTidal: document.getElementById('btnConnectTidal'),
   btnTidalLogout: document.getElementById('btnTidalLogout'),
 
+  ytmusicCard: document.getElementById('ytmusicCard'),
+  ytmusicStatusBadge: document.getElementById('ytmusicStatusBadge'),
+  ytmusicStatusText: document.getElementById('ytmusicStatusText'),
+  ytmusicAvatar: document.getElementById('ytmusicAvatar'),
+  ytmusicUserName: document.getElementById('ytmusicUserName'),
+  ytmusicMetaText: document.getElementById('ytmusicMetaText'),
+  btnConnectYTMusic: document.getElementById('btnConnectYTMusic'),
+  btnYTMusicLogout: document.getElementById('btnYTMusicLogout'),
+
   // Playlists Section
   playlistsSection: document.getElementById('playlistsSection'),
   playlistsSubtitle: document.getElementById('playlistsSubtitle'),
@@ -39,10 +50,16 @@ const el = {
   selectionCount: document.getElementById('selectionCount'),
   prefixInput: document.getElementById('prefixInput'),
 
-  // Bottom Dock
+  // Bottom Dock & Destination
   bottomDock: document.getElementById('bottomDock'),
   dockCount: document.getElementById('dockCount'),
   btnStartTransfer: document.getElementById('btnStartTransfer'),
+  btnStartTransferText: document.getElementById('btnStartTransferText'),
+  destTidalRadio: document.getElementById('destTidalRadio'),
+  destYtRadio: document.getElementById('destYtRadio'),
+  destBothRadio: document.getElementById('destBothRadio'),
+  algoBoosterBox: document.getElementById('algoBoosterBox'),
+  chkTrainAlgorithm: document.getElementById('chkTrainAlgorithm'),
 
   // Modals
   spotifyConfigModal: document.getElementById('spotifyConfigModal'),
@@ -58,6 +75,14 @@ const el = {
   btnOpenTidalLink: document.getElementById('btnOpenTidalLink'),
   tidalDirectLinkText: document.getElementById('tidalDirectLinkText'),
   btnVerifyTidalNow: document.getElementById('btnVerifyTidalNow'),
+
+  ytmusicModal: document.getElementById('ytmusicModal'),
+  btnCloseYTMusicModal: document.getElementById('btnCloseYTMusicModal'),
+  btnCancelYTMusicModal: document.getElementById('btnCancelYTMusicModal'),
+  ytmusicConnectForm: document.getElementById('ytmusicConnectForm'),
+  ytmusicHeadersInput: document.getElementById('ytmusicHeadersInput'),
+  btnSubmitYTMusicConnect: document.getElementById('btnSubmitYTMusicConnect'),
+  ytmusicConnectError: document.getElementById('ytmusicConnectError'),
 
   multiUrlModal: document.getElementById('multiUrlModal'),
   btnCloseMultiUrl: document.getElementById('btnCloseMultiUrl'),
@@ -175,6 +200,32 @@ function setupEventListeners() {
     }
   });
 
+  // YouTube Music Connection
+  if (el.btnConnectYTMusic) {
+    el.btnConnectYTMusic.addEventListener('click', () => {
+      if (el.ytmusicConnectError) el.ytmusicConnectError.style.display = 'none';
+      el.ytmusicModal.showModal();
+    });
+  }
+  if (el.btnCloseYTMusicModal) {
+    el.btnCloseYTMusicModal.addEventListener('click', () => el.ytmusicModal.close());
+  }
+  if (el.btnCancelYTMusicModal) {
+    el.btnCancelYTMusicModal.addEventListener('click', () => el.ytmusicModal.close());
+  }
+  if (el.ytmusicConnectForm) {
+    el.ytmusicConnectForm.addEventListener('submit', onYTMusicConnectSubmit);
+  }
+  if (el.btnYTMusicLogout) {
+    el.btnYTMusicLogout.addEventListener('click', onYTMusicLogout);
+  }
+
+  // Destination Radios
+  [el.destTidalRadio, el.destYtRadio, el.destBothRadio].forEach(r => {
+    if (r) {
+      r.addEventListener('change', onDestinationChange);
+    }
+  });
 
   // Playlists Search & Selection
   el.searchInput.addEventListener('input', (e) => {
@@ -199,6 +250,82 @@ function setupEventListeners() {
   el.btnCopyReport.addEventListener('click', copyReportToClipboard);
 }
 
+// Destination Change Handler
+function onDestinationChange() {
+  if (el.destTidalRadio && el.destTidalRadio.checked) {
+    state.destination = 'tidal';
+    if (el.algoBoosterBox) el.algoBoosterBox.style.display = 'none';
+    if (el.btnStartTransferText) el.btnStartTransferText.textContent = 'Iniciar Transferencia a TIDAL';
+  } else if (el.destYtRadio && el.destYtRadio.checked) {
+    state.destination = 'ytmusic';
+    if (el.algoBoosterBox) el.algoBoosterBox.style.display = 'flex';
+    if (el.btnStartTransferText) el.btnStartTransferText.textContent = 'Iniciar Transferencia a YouTube';
+  } else if (el.destBothRadio && el.destBothRadio.checked) {
+    state.destination = 'both';
+    if (el.algoBoosterBox) el.algoBoosterBox.style.display = 'flex';
+    if (el.btnStartTransferText) el.btnStartTransferText.textContent = 'Iniciar Transferencia a TIDAL & YouTube';
+  }
+  updateBottomDock();
+}
+
+// YouTube Music Connect Form Submit
+async function onYTMusicConnectSubmit(e) {
+  e.preventDefault();
+  const rawHeaders = el.ytmusicHeadersInput.value.trim();
+  if (!rawHeaders) {
+    if (el.ytmusicConnectError) {
+      el.ytmusicConnectError.textContent = 'Por favor pega las cabeceras o cookies de YouTube Music.';
+      el.ytmusicConnectError.style.display = 'block';
+    }
+    return;
+  }
+
+  el.btnSubmitYTMusicConnect.disabled = true;
+  el.btnSubmitYTMusicConnect.textContent = 'Conectando...';
+  if (el.ytmusicConnectError) el.ytmusicConnectError.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/ytmusic/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ headers_raw: rawHeaders })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      el.ytmusicModal.close();
+      el.ytmusicHeadersInput.value = '';
+      showNotification('¡YouTube Music conectado exitosamente!', 'success');
+      await refreshAppStatus();
+    } else {
+      if (el.ytmusicConnectError) {
+        el.ytmusicConnectError.textContent = data.detail || 'Error al conectar con YouTube Music.';
+        el.ytmusicConnectError.style.display = 'block';
+      }
+    }
+  } catch (err) {
+    if (el.ytmusicConnectError) {
+      el.ytmusicConnectError.textContent = 'Error: ' + err.message;
+      el.ytmusicConnectError.style.display = 'block';
+    }
+  } finally {
+    el.btnSubmitYTMusicConnect.disabled = false;
+    el.btnSubmitYTMusicConnect.textContent = 'Conectar YouTube Music';
+  }
+}
+
+// YouTube Music Logout
+async function onYTMusicLogout() {
+  if (!confirm('¿Deseas desconectar tu cuenta de YouTube Music?')) return;
+  try {
+    await fetch('/api/ytmusic/disconnect', { method: 'POST' });
+    showNotification('Sesión de YouTube Music cerrada', 'info');
+    await refreshAppStatus();
+  } catch (err) {
+    console.error('Error cerrando sesión de YouTube Music:', err);
+  }
+}
+
 // App Status & Services Refresh
 async function refreshAppStatus() {
   try {
@@ -207,8 +334,10 @@ async function refreshAppStatus() {
 
     state.spotify = data.spotify;
     state.tidal = data.tidal;
+    state.ytmusic = data.ytmusic;
 
     updateTidalUI();
+    updateYTMusicUI();
     await loadPlaylists();
 
     if (data.transfer && data.transfer.is_running) {
@@ -217,6 +346,35 @@ async function refreshAppStatus() {
   } catch (err) {
     console.error('Error obteniendo estado de la aplicación:', err);
   }
+}
+
+// YouTube Music UI Updates
+function updateYTMusicUI() {
+  if (!el.ytmusicStatusBadge) return;
+  const isAuth = state.ytmusic && state.ytmusic.authenticated;
+  el.ytmusicStatusBadge.className = `status-badge ${isAuth ? 'connected' : 'disconnected'}`;
+  el.ytmusicStatusText.textContent = isAuth ? 'Conectado' : 'Desconectado';
+
+  if (isAuth && state.ytmusic.profile) {
+    const p = state.ytmusic.profile;
+    el.ytmusicUserName.textContent = p.name || 'Usuario de YouTube';
+    el.ytmusicMetaText.textContent = p.handle ? `${p.handle} • Algoritmo listo` : 'Sesión activa en YouTube Music';
+    el.btnConnectYTMusic.textContent = 'Reconectar';
+    el.btnYTMusicLogout.style.display = 'inline-flex';
+    if (p.photo) {
+      el.ytmusicAvatar.innerHTML = `<img src="${p.photo}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+    } else {
+      el.ytmusicAvatar.textContent = (p.name || 'Y').charAt(0).toUpperCase();
+    }
+  } else {
+    el.ytmusicUserName.textContent = 'No conectado';
+    el.ytmusicMetaText.textContent = 'Migra playlists y re-entrena el algoritmo con Likes';
+    el.btnConnectYTMusic.textContent = 'Conectar YouTube Music';
+    el.btnYTMusicLogout.style.display = 'none';
+    el.ytmusicAvatar.textContent = 'YT';
+  }
+
+  updateBottomDock();
 }
 
 // Tidal UI Updates
@@ -562,15 +720,33 @@ function updateSelectionUI() {
 
 function updateBottomDock() {
   const count = state.selectedPlaylistIds.size;
-  if (count > 0 && state.tidal.authenticated) {
-    el.bottomDock.classList.remove('hidden');
-    el.btnStartTransfer.disabled = false;
-  } else if (count > 0 && !state.tidal.authenticated) {
-    el.bottomDock.classList.remove('hidden');
-    el.dockCount.textContent = `${count} playlist(s) lista(s). Conecta TIDAL para iniciar.`;
-    el.btnStartTransfer.disabled = true;
-  } else {
+  if (count === 0) {
     el.bottomDock.classList.add('hidden');
+    return;
+  }
+
+  el.bottomDock.classList.remove('hidden');
+
+  const dest = state.destination;
+  let canTransfer = false;
+  let authMsg = '';
+
+  if (dest === 'tidal') {
+    canTransfer = state.tidal && state.tidal.authenticated;
+    authMsg = 'Conecta TIDAL para iniciar.';
+  } else if (dest === 'ytmusic') {
+    canTransfer = state.ytmusic && state.ytmusic.authenticated;
+    authMsg = 'Conecta YouTube Music para iniciar.';
+  } else if (dest === 'both') {
+    canTransfer = Boolean(state.tidal?.authenticated && state.ytmusic?.authenticated);
+    authMsg = 'Conecta TIDAL y YouTube Music para iniciar.';
+  }
+
+  if (canTransfer) {
+    el.btnStartTransfer.disabled = false;
+  } else {
+    el.btnStartTransfer.disabled = true;
+    el.dockCount.textContent = `${count} playlist(s) seleccionada(s). ${authMsg}`;
   }
 }
 
@@ -582,13 +758,21 @@ async function startTransfer() {
     return;
   }
 
-  if (!state.tidal.authenticated) {
+  const dest = state.destination;
+  if ((dest === 'tidal' || dest === 'both') && (!state.tidal || !state.tidal.authenticated)) {
     alert('Debes conectar tu cuenta de TIDAL primero.');
     onConnectTidalClick();
     return;
   }
 
+  if ((dest === 'ytmusic' || dest === 'both') && (!state.ytmusic || !state.ytmusic.authenticated)) {
+    alert('Debes conectar tu cuenta de YouTube Music primero.');
+    if (el.ytmusicModal) el.ytmusicModal.showModal();
+    return;
+  }
+
   const prefix = el.prefixInput.value.trim();
+  const trainAlgo = el.chkTrainAlgorithm ? el.chkTrainAlgorithm.checked : false;
 
   try {
     const res = await fetch('/api/transfer/start', {
@@ -596,6 +780,8 @@ async function startTransfer() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         playlist_ids: playlistIds,
+        destination: dest,
+        train_algorithm: trainAlgo,
         custom_prefix: prefix,
         public_on_tidal: false
       })
@@ -616,7 +802,8 @@ async function startTransfer() {
 
 function openTransferModal() {
   el.transferOverlay.classList.remove('hidden');
-  el.transferModalTitle.textContent = 'Migrando Playlists a TIDAL...';
+  const destName = state.destination === 'both' ? 'TIDAL y YouTube Music' : (state.destination === 'ytmusic' ? 'YouTube Music' : 'TIDAL');
+  el.transferModalTitle.textContent = `Migrando Playlists a ${destName}...`;
   el.btnCancelTransfer.style.display = 'inline-flex';
   el.btnCancelTransfer.disabled = false;
   el.btnCancelTransfer.textContent = 'Detener';
@@ -666,13 +853,13 @@ function handleTransferEvent(payload) {
     const pct = Math.round(((data.index - 1) / data.total) * 100);
     el.plProgressBar.style.width = `${pct}%`;
     el.plPercentLabel.textContent = `${pct}%`;
-    appendFeedItem(`Iniciando migración de "${data.playlist_name}" ➔ "${data.tidal_title}"`, 'fuzzy');
+    appendFeedItem(`Iniciando migración de "${data.playlist_name}" ➔ "${data.target_title || data.tidal_title}"`, 'fuzzy');
   }
 
   else if (ev === 'track_matched') {
     const prog = data.progress || {};
     el.tickerSong.textContent = data.spotify_track;
-    el.tickerArtist.textContent = `${data.spotify_artist} ➔ TIDAL: ${data.tidal_track} (${data.tidal_artist})`;
+    el.tickerArtist.textContent = `${data.spotify_artist} ➔ TIDAL: ${data.matched_track || data.tidal_track}`;
     
     if (prog.total > 0) {
       const pct = Math.min(100, Math.round((prog.processed / prog.total) * 100));
@@ -683,13 +870,31 @@ function handleTransferEvent(payload) {
 
     const tagClass = data.match_type === 'ISRC_EXACT' ? 'isrc' : 'fuzzy';
     const tagText = data.match_type === 'ISRC_EXACT' ? 'ISRC 100%' : `${data.confidence}% Match`;
-    appendFeedItem(`${data.spotify_artist} - ${data.spotify_track}`, tagClass, tagText);
+    appendFeedItem(`[TIDAL] ${data.spotify_artist} - ${data.spotify_track}`, tagClass, tagText);
   }
 
-  else if (ev === 'track_missed') {
+  else if (ev === 'yt_matched') {
     const prog = data.progress || {};
+    el.tickerSong.textContent = data.matched_track;
+    el.tickerArtist.textContent = `${data.matched_artist} • YouTube Music` + (data.liked_for_algorithm ? ' (🔥 Like asignado al algoritmo)' : '');
+    
+    if (prog.total > 0) {
+      const pct = Math.min(100, Math.round((prog.processed / prog.total) * 100));
+      el.trackProgressBar.style.width = `${pct}%`;
+      el.trackProgressLabel.textContent = `Canciones: ${prog.processed} / ${prog.total}`;
+    }
+    el.matchStatsLabel.textContent = `✅ ${prog.matched} emparejadas (${prog.missed || 0} no encontradas)${prog.yt_liked_count ? ` • 🔥 ${prog.yt_liked_count} Likes` : ''}`;
+
+    const tagText = data.liked_for_algorithm ? 'YouTube + Like ❤️' : `${data.confidence}% Match`;
+    const tagClass = data.liked_for_algorithm ? 'isrc' : 'fuzzy';
+    appendFeedItem(`[YouTube] ${data.matched_artist} - ${data.matched_track}`, tagClass, tagText);
+  }
+
+  else if (ev === 'track_missed' || ev === 'yt_missed') {
+    const prog = data.progress || {};
+    const platform = data.platform || 'Destino';
     el.tickerSong.textContent = data.spotify_track;
-    el.tickerArtist.textContent = `${data.spotify_artist} (No localizada en TIDAL)`;
+    el.tickerArtist.textContent = `${data.spotify_artist} (No localizada en ${platform})`;
     
     if (prog.total > 0) {
       const pct = Math.min(100, Math.round((prog.processed / prog.total) * 100));
@@ -697,11 +902,11 @@ function handleTransferEvent(payload) {
       el.trackProgressLabel.textContent = `Canciones: ${prog.processed} / ${prog.total}`;
     }
     el.matchStatsLabel.textContent = `✅ ${prog.matched} emparejadas (${prog.missed || 0} no encontradas)`;
-    appendFeedItem(`${data.spotify_artist} - ${data.spotify_track}`, 'missed', 'No encontrada');
+    appendFeedItem(`[${platform}] ${data.spotify_artist} - ${data.spotify_track}`, 'missed', 'No encontrada');
   }
 
   else if (ev === 'playlist_done') {
-    appendFeedItem(`✔ Playlist "${data.playlist_name}" completada: ${data.tracks_matched}/${data.tracks_total} canciones añadidas.`, 'isrc');
+    appendFeedItem(`✔ Playlist "${data.playlist_name}" completada: ${data.tracks_total} canciones procesadas.`, 'isrc');
   }
 
   else if (ev === 'completed') {
@@ -719,8 +924,13 @@ function handleTransferEvent(payload) {
     }
 
     el.tickerSong.textContent = '¡Proceso terminado con éxito!';
-    el.tickerArtist.textContent = `Se transfirieron ${data.summary?.tracks_matched || 0} canciones a TIDAL.`;
-    appendFeedItem('🎉 ¡Proceso finalizado! Revisa tu biblioteca en la app de TIDAL.', 'isrc');
+    const summary = data.summary || {};
+    let summaryText = `Se transfirieron ${summary.tracks_matched || 0} canciones.`;
+    if (summary.yt_liked_count > 0) {
+      summaryText += ` 🔥 Se asignaron ${summary.yt_liked_count} 'Me Gusta' para entrenar el algoritmo de YouTube.`;
+    }
+    el.tickerArtist.textContent = summaryText;
+    appendFeedItem('🎉 ¡Proceso finalizado! Revisa tu biblioteca en TIDAL o YouTube Music.', 'isrc');
 
     if (state.eventSource) {
       state.eventSource.close();

@@ -17,9 +17,10 @@ from app.config import (
 )
 from app.spotify_client import spotify_manager
 from app.tidal_client import tidal_manager
+from app.ytmusic_client import ytmusic_manager
 from app.transfer_engine import transfer_engine
 
-app = FastAPI(title="Spotify to Tidal Pro Transfer")
+app = FastAPI(title="Spotify to Tidal & YouTube Pro Transfer")
 
 # Static files path
 STATIC_DIR = BASE_DIR / "app" / "static"
@@ -38,11 +39,16 @@ class SpotifyConfigRequest(BaseModel):
 
 class TransferStartRequest(BaseModel):
     playlist_ids: List[str]
+    destination: Optional[str] = "tidal"  # "tidal", "ytmusic", "both"
+    train_algorithm: Optional[bool] = False
     custom_prefix: Optional[str] = ""
     public_on_tidal: Optional[bool] = False
 
 class ImportUrlRequest(BaseModel):
     url: str
+
+class YTMusicConnectRequest(BaseModel):
+    headers_raw: str
 
 # Endpoints
 @app.get("/", response_class=HTMLResponse)
@@ -57,9 +63,11 @@ async def serve_index():
 async def get_services_status():
     spotify_auth = spotify_manager.is_authenticated()
     tidal_auth = tidal_manager.is_authenticated()
+    ytmusic_auth = ytmusic_manager.is_authenticated()
 
     spotify_profile = None
     tidal_profile = None
+    ytmusic_profile = None
 
     if spotify_auth:
         try:
@@ -73,6 +81,12 @@ async def get_services_status():
         except Exception:
             tidal_auth = False
 
+    if ytmusic_auth:
+        try:
+            ytmusic_profile = ytmusic_manager.get_user_info()
+        except Exception:
+            ytmusic_auth = False
+
     return {
         "spotify": {
             "configured": spotify_manager.is_configured(),
@@ -82,6 +96,10 @@ async def get_services_status():
         "tidal": {
             "authenticated": tidal_auth,
             "profile": tidal_profile,
+        },
+        "ytmusic": {
+            "authenticated": ytmusic_auth,
+            "profile": ytmusic_profile,
         },
         "transfer": {
             "is_running": transfer_engine.is_running,
@@ -240,6 +258,33 @@ async def tidal_logout():
     tidal_manager.logout()
     return {"success": True}
 
+# YouTube Music Endpoints
+@app.get("/api/ytmusic/status")
+async def get_ytmusic_status():
+    is_auth = ytmusic_manager.is_authenticated()
+    user_info = ytmusic_manager.get_user_info() if is_auth else None
+    return {
+        "authenticated": is_auth,
+        "profile": user_info
+    }
+
+@app.post("/api/ytmusic/connect")
+async def connect_ytmusic(req: YTMusicConnectRequest):
+    try:
+        success = ytmusic_manager.setup_from_headers(req.headers_raw)
+        if success:
+            user_info = ytmusic_manager.get_user_info()
+            return {"success": True, "profile": user_info, "message": "Conectado a YouTube Music exitosamente."}
+        else:
+            raise HTTPException(status_code=400, detail="No se pudo verificar la sesión de YouTube Music.")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/ytmusic/disconnect")
+async def disconnect_ytmusic():
+    ytmusic_manager.logout()
+    return {"success": True, "message": "Desconectado de YouTube Music."}
+
 # Transfer Endpoints
 @app.post("/api/transfer/start")
 async def start_transfer(req: TransferStartRequest):
@@ -250,6 +295,8 @@ async def start_transfer(req: TransferStartRequest):
         transfer_engine.start_transfer_task(
             loop=loop,
             playlist_ids=req.playlist_ids,
+            destination=req.destination or "tidal",
+            train_algorithm=req.train_algorithm or False,
             custom_prefix=req.custom_prefix or "",
             public_on_tidal=req.public_on_tidal or False,
         )

@@ -13,13 +13,13 @@
     <!-- Header -->
     <header class="app-header">
       <div class="brand-badge">
-        <span>SPOTIFY</span> ➔ <span>TIDAL</span> MIGRATOR PRO
+        <span>SPOTIFY</span> ➔ <span>TIDAL & YOUTUBE</span> PRO
       </div>
       <h1 class="app-title">
-        Traslada tus Playlists a <span class="td-txt">TIDAL</span>
+        Traslada tus Playlists a <span class="td-txt">TIDAL</span> o <span style="background: linear-gradient(135deg, #ff4e45, #ff0000); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">YouTube</span>
       </h1>
       <p class="app-subtitle">
-        Rápido, sencillo y directo. Conecta TIDAL en 1 clic y carga tus listas de Spotify sin claves de desarrollador.
+        Sin límites de canciones. Migra tus listas y re-entrena el algoritmo musical de YouTube con tus verdaderos gustos.
       </p>
     </header>
 
@@ -87,35 +87,73 @@
         </div>
       </div>
 
-      <!-- Tidal Card -->
-      <div class="service-card tidal-card" id="tidalCard">
-        <div class="card-top">
-          <div class="service-brand">
-            <svg viewBox="0 0 24 24" fill="#00e5ff">
-              <path d="M12.012 3.992L8.008 7.996 4.004 3.992 0 7.996l4.004 4.004 4.004-4.004 4.004 4.004 4.004-4.004L12.012 3.992zm7.984 0l-4.004 4.004 4.004 4.004 4.004-4.004-4.004-4.004zm-7.984 8.008l-4.004 4.004 4.004 4.004 4.004-4.004-4.004-4.004z"/>
-            </svg>
-            <span class="service-name">TIDAL</span>
+      <!-- Destinations Column -->
+      <div class="destinations-column" style="display: flex; flex-direction: column; gap: 1.25rem;">
+        
+        <!-- Tidal Card -->
+        <div class="service-card tidal-card" id="tidalCard">
+          <div class="card-top">
+            <div class="service-brand">
+              <svg viewBox="0 0 24 24" fill="#00e5ff">
+                <path d="M12.012 3.992L8.008 7.996 4.004 3.992 0 7.996l4.004 4.004 4.004-4.004 4.004 4.004 4.004-4.004L12.012 3.992zm7.984 0l-4.004 4.004 4.004 4.004 4.004-4.004-4.004-4.004zm-7.984 8.008l-4.004 4.004 4.004 4.004 4.004-4.004-4.004-4.004z"/>
+              </svg>
+              <span class="service-name">TIDAL</span>
+            </div>
+            <div class="status-badge disconnected" id="tidalStatusBadge">
+              <span class="dot"></span>
+              <span id="tidalStatusText">Desconectado</span>
+            </div>
           </div>
-          <div class="status-badge disconnected" id="tidalStatusBadge">
-            <span class="dot"></span>
-            <span id="tidalStatusText">Desconectado</span>
+
+          <div class="service-profile" id="tidalProfile">
+            <div class="profile-avatar" id="tidalAvatar">TD</div>
+            <div class="profile-info">
+              <h4 id="tidalUserName">No conectado</h4>
+              <p id="tidalMetaText">Conexión oficial en 1 clic sin claves de desarrollador</p>
+            </div>
+          </div>
+
+          <div class="service-actions">
+            <button class="btn btn-tidal" id="btnConnectTidal" style="width: 100%;">
+              Conectar TIDAL en 1 Clic
+            </button>
+            <button class="btn btn-danger hidden" id="btnTidalLogout" style="display:none;">Desconectar</button>
           </div>
         </div>
 
-        <div class="service-profile" id="tidalProfile">
-          <div class="profile-avatar" id="tidalAvatar">TD</div>
-          <div class="profile-info">
-            <h4 id="tidalUserName">No conectado</h4>
-            <p id="tidalMetaText">Conexión oficial en 1 clic sin claves de desarrollador</p>
+        <!-- YouTube Music Card -->
+        <div class="service-card ytmusic-card" id="ytmusicCard">
+          <div class="card-top">
+            <div class="service-brand">
+              <svg viewBox="0 0 24 24" width="22" height="22">
+                <circle cx="12" cy="12" r="10" fill="#ff0000"/>
+                <circle cx="12" cy="12" r="7" fill="#0b0e14"/>
+                <polygon points="10,8.5 15.5,12 10,15.5" fill="#ffffff"/>
+              </svg>
+              <span class="service-name" style="color:#ff4e45;">YouTube Music</span>
+            </div>
+            <div class="status-badge disconnected" id="ytmusicStatusBadge">
+              <span class="dot"></span>
+              <span id="ytmusicStatusText">Desconectado</span>
+            </div>
+          </div>
+
+          <div class="service-profile" id="ytmusicProfile">
+            <div class="profile-avatar" id="ytmusicAvatar" style="background: linear-gradient(135deg, #ff0000, #b30000);">YT</div>
+            <div class="profile-info">
+              <h4 id="ytmusicUserName">No conectado</h4>
+              <p id="ytmusicMetaText">Migra playlists y re-entrena el algoritmo con Likes</p>
+            </div>
+          </div>
+
+          <div class="service-actions">
+            <button class="btn btn-ytmusic" id="btnConnectYTMusic" style="width: 100%;">
+              Conectar YouTube Music
+            </button>
+            <button class="btn btn-danger hidden" id="btnYTMusicLogout" style="display:none;">Desconectar</button>
           </div>
         </div>
 
-        <div class="service-actions">
-          <button class="btn btn-tidal" id="btnConnectTidal" style="width: 100%;">
-            Conectar TIDAL en 1 Clic
-          </button>
-          <button class="btn btn-danger hidden" id="btnTidalLogout" style="display:none;">Desconectar</button>
-        </div>
       </div>
 
     </section>
@@ -178,14 +216,38 @@
 
   <!-- Bottom Floating Action Dock -->
   <div class="bottom-dock hidden" id="bottomDock">
-    <div id="dockInfo">
+    <div id="dockInfo" style="display:flex; flex-direction:column; gap:0.4rem;">
       <strong id="dockCount">0 playlists seleccionadas</strong>
+      <div style="display:flex; gap:0.85rem; align-items:center; flex-wrap:wrap;">
+        <span style="font-size:0.82rem; color:var(--text-muted); font-weight:600;">Destino:</span>
+        <label style="font-size:0.84rem; display:flex; align-items:center; gap:0.35rem; cursor:pointer; color:var(--tidal-cyan); font-weight:500;">
+          <input type="radio" name="destChoice" value="tidal" id="destTidalRadio" checked>
+          <span>TIDAL</span>
+        </label>
+        <label style="font-size:0.84rem; display:flex; align-items:center; gap:0.35rem; cursor:pointer; color:#ff4e45; font-weight:500;">
+          <input type="radio" name="destChoice" value="ytmusic" id="destYtRadio">
+          <span>YouTube Music</span>
+        </label>
+        <label style="font-size:0.84rem; display:flex; align-items:center; gap:0.35rem; cursor:pointer; color:#a78bfa; font-weight:500;">
+          <input type="radio" name="destChoice" value="both" id="destBothRadio">
+          <span>Ambos</span>
+        </label>
+      </div>
     </div>
+
+    <!-- Algorithmic Booster Switch (shown when YouTube is in destination) -->
+    <div id="algoBoosterBox" style="display:none; align-items:center; background:rgba(255,0,0,0.12); border:1px solid rgba(255,0,0,0.3); border-radius:8px; padding:0.45rem 0.85rem;">
+      <label style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; color:#ff6b6b; font-weight:600;">
+        <input type="checkbox" id="chkTrainAlgorithm" checked>
+        <span>🔥 Entrenar Algoritmo de YouTube (Dar "Me Gusta" automático)</span>
+      </label>
+    </div>
+
     <button class="btn btn-tidal btn-lg" id="btnStartTransfer">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <polygon points="5 3 19 12 5 21 5 3"></polygon>
       </svg>
-      Iniciar Transferencia a TIDAL
+      <span id="btnStartTransferText">Iniciar Transferencia a TIDAL</span>
     </button>
   </div>
 
@@ -314,6 +376,46 @@
       <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
         <button type="button" class="btn btn-ghost" id="btnCancelMultiUrl">Cancelar</button>
         <button type="submit" class="btn btn-spotify" id="btnSubmitMultiUrl">Cargar Playlists</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: YouTube Music Connection -->
+  <dialog class="modal-dialog" id="ytmusicModal" style="max-width: 600px;">
+    <div class="modal-header">
+      <div style="display:flex; align-items:center; gap:0.5rem;">
+        <svg viewBox="0 0 24 24" width="22" height="22">
+          <circle cx="12" cy="12" r="10" fill="#ff0000"/>
+          <circle cx="12" cy="12" r="7" fill="#0b0e14"/>
+          <polygon points="10,8.5 15.5,12 10,15.5" fill="#ffffff"/>
+        </svg>
+        <h3 style="margin:0;">Conectar YouTube Music</h3>
+      </div>
+      <button class="btn-close" id="btnCloseYTMusicModal">&times;</button>
+    </div>
+    
+    <div class="help-box" style="background:rgba(255,0,0,0.06); border-color:rgba(255,0,0,0.25);">
+      <strong style="color:#ff6b6b;">¿Cómo conectar tu cuenta para entrenar el algoritmo?</strong>
+      <p style="margin-top:0.3rem; font-size:0.82rem; color:var(--text-muted);">
+        Para transferir sin límites de cuota y dar "Me Gusta" automático en YouTube Music:
+      </p>
+      <ol style="margin-left: 1.2rem; margin-top: 0.5rem; font-size:0.82rem; line-height:1.6;">
+        <li>Abre <a href="https://music.youtube.com" target="_blank" rel="noopener" style="color:#ff6b6b; text-decoration:underline;">music.youtube.com</a> en Chrome o Edge con tu cuenta iniciada.</li>
+        <li>Presiona <kbd>F12</kbd> (o clic derecho > <em>Inspeccionar</em>) y ve a la pestaña <strong>Red (Network)</strong>.</li>
+        <li>Filtra por <code>browse</code>, haz clic derecho sobre esa petición > <strong>Copiar > Copiar cabeceras de solicitud (Copy request headers)</strong>.</li>
+        <li>Pega el texto copiado en el recuadro de abajo.</li>
+      </ol>
+    </div>
+
+    <form id="ytmusicConnectForm">
+      <div class="form-group">
+        <label for="ytmusicHeadersInput" style="font-size:0.85rem; font-weight:600;">Cabeceras o Cookie de YouTube Music:</label>
+        <textarea class="form-input" id="ytmusicHeadersInput" rows="6" placeholder="Pega aquí las cabeceras de la petición (o tus cookies de music.youtube.com)..." style="font-family: monospace; font-size: 0.78rem; resize: vertical;"></textarea>
+      </div>
+      <div id="ytmusicConnectError" style="color:#ff4e45; font-size:0.82rem; margin-bottom:0.75rem; display:none;"></div>
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+        <button type="button" class="btn btn-ghost" id="btnCancelYTMusicModal">Cancelar</button>
+        <button type="submit" class="btn btn-ytmusic" id="btnSubmitYTMusicConnect">Conectar YouTube Music</button>
       </div>
     </form>
   </dialog>

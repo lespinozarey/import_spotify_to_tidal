@@ -6,6 +6,7 @@ from datetime import datetime
 
 from app.spotify_client import spotify_manager
 from app.tidal_client import tidal_manager
+from app.ytmusic_client import ytmusic_manager
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,8 @@ class TransferEngine:
         self.subscribers: List[asyncio.Queue] = []
         self.current_state: Dict[str, Any] = {
             "status": "idle",  # idle, running, completed, error, cancelled
+            "destination": "tidal",
+            "train_algorithm": False,
             "playlists_total": 0,
             "playlists_completed": 0,
             "current_playlist": None,
@@ -23,6 +26,7 @@ class TransferEngine:
             "tracks_processed": 0,
             "tracks_matched": 0,
             "tracks_missed": 0,
+            "yt_liked_count": 0,
             "recent_events": [],
             "missing_tracks": [],
             "error_message": None,
@@ -44,15 +48,13 @@ class TransferEngine:
     def _broadcast(self, event_type: str, data: Dict[str, Any]):
         event = {"event": event_type, "data": data, "timestamp": datetime.now().isoformat()}
         
-        # Keep recent event in memory
         recent = self.current_state.get("recent_events", [])
-        if event_type in ["track_matched", "track_missed", "playlist_start", "playlist_done", "error"]:
+        if event_type in ["track_matched", "track_missed", "yt_matched", "yt_missed", "yt_liked", "playlist_start", "playlist_done", "error"]:
             recent.append(event)
             if len(recent) > 60:
                 recent.pop(0)
             self.current_state["recent_events"] = recent
 
-        # Put into queues for all connected SSE clients
         if self._loop and not self._loop.is_closed():
             for q in list(self.subscribers):
                 try:
@@ -70,20 +72,28 @@ class TransferEngine:
         self,
         loop: asyncio.AbstractEventLoop,
         playlist_ids: List[str],
+        destination: str = "tidal",
+        train_algorithm: bool = False,
         custom_prefix: str = "",
         public_on_tidal: bool = False,
     ):
         if self.is_running:
             raise RuntimeError("Ya hay una transferencia en ejecución.")
 
-        if not tidal_manager.is_authenticated():
+        dest = destination.lower()
+        if dest in ["tidal", "both"] and not tidal_manager.is_authenticated():
             raise PermissionError("TIDAL no está conectado. Conéctate primero a TIDAL.")
+
+        if dest in ["ytmusic", "both"] and not ytmusic_manager.is_authenticated():
+            raise PermissionError("YouTube Music no está conectado. Conéctate primero a YouTube Music.")
 
         self.is_running = True
         self.should_cancel = False
         self._loop = loop
         self.current_state = {
             "status": "running",
+            "destination": dest,
+            "train_algorithm": bool(train_algorithm),
             "playlists_total": len(playlist_ids),
             "playlists_completed": 0,
             "current_playlist": None,
@@ -91,6 +101,7 @@ class TransferEngine:
             "tracks_processed": 0,
             "tracks_matched": 0,
             "tracks_missed": 0,
+            "yt_liked_count": 0,
             "recent_events": [],
             "missing_tracks": [],
             "error_message": None,
@@ -100,14 +111,15 @@ class TransferEngine:
 
         self._thread = threading.Thread(
             target=self._run_transfer,
-            args=(playlist_ids, custom_prefix, public_on_tidal),
+            args=(playlist_ids, dest, train_algorithm, custom_prefix, public_on_tidal),
             daemon=True
         )
         self._thread.start()
 
-    def _run_transfer(self, playlist_ids: List[str], custom_prefix: str, public_on_tidal: bool):
+    def _run_transfer(self, playlist_ids: List[str], destination: str, train_algorithm: bool, custom_prefix: str, public_on_tidal: bool):
         try:
-            self._broadcast("status_update", {"status": "running", "message": "Iniciando transferencia..."})
+            dest_label = "TIDAL y YouTube Music" if destination == "both" else ("YouTube Music" if destination == "ytmusic" else "TIDAL")
+            self._broadcast("status_update", {"status": "running", "message": f"Iniciando transferencia hacia {dest_label}..."})
 
             for p_idx, playlist_id in enumerate(playlist_ids):
                 if self.should_cancel:
@@ -115,7 +127,7 @@ class TransferEngine:
                     self._broadcast("status_update", {"status": "cancelled", "message": "Transferencia cancelada por el usuario."})
                     return
 
-                # 1. Fetch Playlist Info & Tracks (From memory, Spotify API or Embed)
+                # 1. Fetch Playlist Info & Tracks
                 pl_name = f"Playlist {p_idx+1}"
                 pl_desc = "Importada desde Spotify"
                 tracks = []
@@ -135,7 +147,6 @@ class TransferEngine:
                     except Exception as e:
                         logger.error(f"Error con Spotify API para playlist {playlist_id}: {e}")
                 
-                # If still no tracks, try fetching without login
                 if not tracks:
                     try:
                         pl_info = spotify_manager.fetch_playlist_without_login(playlist_id)
@@ -146,119 +157,210 @@ class TransferEngine:
                         self._broadcast("error", {"message": f"No se pudo obtener el contenido de la playlist: {e}"})
                         continue
 
-                tidal_title = f"{custom_prefix} {pl_name}".strip() if custom_prefix else pl_name
+                target_title = f"{custom_prefix} {pl_name}".strip() if custom_prefix else pl_name
 
                 self.current_state["current_playlist"] = {
                     "index": p_idx + 1,
                     "total": len(playlist_ids),
                     "name": pl_name,
-                    "tidal_title": tidal_title,
+                    "target_title": target_title,
                 }
 
                 self._broadcast("playlist_start", {
                     "playlist_name": pl_name,
-                    "tidal_title": tidal_title,
+                    "target_title": target_title,
                     "index": p_idx + 1,
-                    "total": len(playlist_ids)
+                    "total": len(playlist_ids),
+                    "tracks_count": len(tracks)
                 })
 
                 self.current_state["tracks_total"] += len(tracks)
 
+                # 2. Transfer to TIDAL if selected
+                if destination in ["tidal", "both"]:
+                    tidal_pl = None
+                    try:
+                        tidal_pl = tidal_manager.create_playlist(
+                            title=target_title,
+                            description=f"{pl_desc} (Migrada con Spotify to TIDAL Pro)"
+                        )
+                    except Exception as e:
+                        logger.error(f"Error creando playlist en Tidal '{target_title}': {e}")
+                        self._broadcast("error", {"message": f"No se pudo crear la playlist '{target_title}' en Tidal: {e}"})
 
-                # 2. Create Playlist on Tidal
-                tidal_pl = None
-                try:
-                    tidal_pl = tidal_manager.create_playlist(
-                        title=tidal_title,
-                        description=f"{pl_desc} (Migrada con Spotify to Tidal Pro)"
-                    )
-                except Exception as e:
-                    logger.error(f"Error creando playlist en Tidal '{tidal_title}': {e}")
-                    self._broadcast("error", {"message": f"No se pudo crear la playlist '{tidal_title}' en Tidal: {e}"})
-                    continue
+                    matched_tidal_ids = []
+                    for t_idx, track in enumerate(tracks):
+                        if self.should_cancel:
+                            self.current_state["status"] = "cancelled"
+                            self._broadcast("status_update", {"status": "cancelled", "message": "Transferencia cancelada."})
+                            return
 
-                # 3. Match and Collect Tidal Track IDs
-                matched_track_ids = []
-                for t_idx, track in enumerate(tracks):
-                    if self.should_cancel:
-                        self.current_state["status"] = "cancelled"
-                        self._broadcast("status_update", {"status": "cancelled", "message": "Transferencia cancelada por el usuario."})
-                        return
+                        t_name = track.get("name", "Desconocido")
+                        t_artists = track.get("artists", [])
+                        t_artist_str = track.get("artist_display", "")
+                        t_isrc = track.get("isrc")
+                        t_dur = track.get("duration_ms")
+                        t_album = track.get("album", "")
 
-                    self.current_state["tracks_processed"] += 1
-                    t_name = track.get("name", "Desconocido")
-                    t_artists = track.get("artists", [])
-                    t_artist_str = track.get("artist_display", "")
-                    t_isrc = track.get("isrc")
-                    t_dur = track.get("duration_ms")
-                    t_album = track.get("album", "")
+                        match_result = tidal_manager.match_track(
+                            name=t_name,
+                            artists=t_artists,
+                            isrc=t_isrc,
+                            duration_ms=t_dur
+                        )
 
-                    match_result = tidal_manager.match_track(
-                        name=t_name,
-                        artists=t_artists,
-                        isrc=t_isrc,
-                        duration_ms=t_dur
-                    )
+                        if match_result:
+                            matched_tidal_ids.append(match_result["tidal_id"])
+                            if destination == "tidal":
+                                self.current_state["tracks_processed"] += 1
+                                self.current_state["tracks_matched"] += 1
+                                self._broadcast("track_matched", {
+                                    "platform": "TIDAL",
+                                    "spotify_track": t_name,
+                                    "spotify_artist": t_artist_str,
+                                    "matched_track": match_result["name"],
+                                    "matched_artist": match_result["artist"],
+                                    "match_type": match_result["match_type"],
+                                    "confidence": match_result["confidence"],
+                                    "audio_quality": match_result["audio_quality"],
+                                    "progress": {
+                                        "processed": self.current_state["tracks_processed"],
+                                        "total": self.current_state["tracks_total"],
+                                        "matched": self.current_state["tracks_matched"],
+                                        "missed": self.current_state["tracks_missed"],
+                                    }
+                                })
+                        else:
+                            if destination == "tidal":
+                                self.current_state["tracks_processed"] += 1
+                                self.current_state["tracks_missed"] += 1
+                                self.current_state["missing_tracks"].append({
+                                    "playlist": pl_name,
+                                    "name": t_name,
+                                    "artist": t_artist_str,
+                                    "album": t_album,
+                                    "platform": "TIDAL"
+                                })
+                                self._broadcast("track_missed", {
+                                    "platform": "TIDAL",
+                                    "spotify_track": t_name,
+                                    "spotify_artist": t_artist_str,
+                                    "progress": {
+                                        "processed": self.current_state["tracks_processed"],
+                                        "total": self.current_state["tracks_total"],
+                                        "matched": self.current_state["tracks_matched"],
+                                        "missed": self.current_state["tracks_missed"],
+                                    }
+                                })
 
-                    if match_result:
-                        matched_track_ids.append(match_result["tidal_id"])
-                        self.current_state["tracks_matched"] += 1
-                        self._broadcast("track_matched", {
-                            "spotify_track": t_name,
-                            "spotify_artist": t_artist_str,
-                            "tidal_track": match_result["name"],
-                            "tidal_artist": match_result["artist"],
-                            "match_type": match_result["match_type"],
-                            "confidence": match_result["confidence"],
-                            "audio_quality": match_result["audio_quality"],
-                            "progress": {
-                                "processed": self.current_state["tracks_processed"],
-                                "total": self.current_state["tracks_total"],
-                                "matched": self.current_state["tracks_matched"],
-                                "missed": self.current_state["tracks_missed"],
-                            }
-                        })
-                    else:
-                        self.current_state["tracks_missed"] += 1
-                        missing_item = {
-                            "playlist": pl_name,
-                            "name": t_name,
-                            "artist": t_artist_str,
-                            "album": t_album,
-                        }
-                        self.current_state["missing_tracks"].append(missing_item)
-                        self._broadcast("track_missed", {
-                            "spotify_track": t_name,
-                            "spotify_artist": t_artist_str,
-                            "progress": {
-                                "processed": self.current_state["tracks_processed"],
-                                "total": self.current_state["tracks_total"],
-                                "matched": self.current_state["tracks_matched"],
-                                "missed": self.current_state["tracks_missed"],
-                            }
-                        })
+                    if matched_tidal_ids and tidal_pl:
+                        tidal_manager.add_tracks_to_playlist(tidal_pl, matched_tidal_ids)
 
-                # 4. Add matched tracks to Tidal playlist in chunks
-                if matched_track_ids and tidal_pl:
-                    tidal_manager.add_tracks_to_playlist(tidal_pl, matched_track_ids)
+                # 3. Transfer to YouTube Music if selected
+                if destination in ["ytmusic", "both"]:
+                    yt_pl_id = None
+                    try:
+                        yt_pl_id = ytmusic_manager.create_playlist(
+                            title=target_title,
+                            description=f"{pl_desc} (Migrada con Spotify to TIDAL & YouTube Pro)"
+                        )
+                    except Exception as e:
+                        logger.error(f"Error creando playlist en YouTube Music '{target_title}': {e}")
+                        self._broadcast("error", {"message": f"No se pudo crear la playlist '{target_title}' en YouTube Music: {e}"})
+
+                    matched_yt_video_ids = []
+                    for t_idx, track in enumerate(tracks):
+                        if self.should_cancel:
+                            self.current_state["status"] = "cancelled"
+                            self._broadcast("status_update", {"status": "cancelled", "message": "Transferencia cancelada."})
+                            return
+
+                        t_name = track.get("name", "Desconocido")
+                        t_artists = track.get("artists", [])
+                        t_artist_str = track.get("artist_display", "")
+                        t_dur = track.get("duration_ms")
+                        t_album = track.get("album", "")
+
+                        yt_match = ytmusic_manager.search_track(
+                            name=t_name,
+                            artists=t_artists,
+                            duration_ms=t_dur
+                        )
+
+                        if yt_match:
+                            matched_yt_video_ids.append(yt_match["videoId"])
+                            
+                            # Algorithmic Booster: Rate song as LIKE
+                            did_like = False
+                            if train_algorithm:
+                                did_like = ytmusic_manager.rate_track_like(yt_match["videoId"])
+                                if did_like:
+                                    self.current_state["yt_liked_count"] += 1
+
+                            self.current_state["tracks_processed"] += 1
+                            self.current_state["tracks_matched"] += 1
+                            self._broadcast("yt_matched", {
+                                "platform": "YouTube Music",
+                                "spotify_track": t_name,
+                                "spotify_artist": t_artist_str,
+                                "matched_track": yt_match["title"],
+                                "matched_artist": yt_match["artist"],
+                                "video_id": yt_match["videoId"],
+                                "thumbnail": yt_match["thumbnail"],
+                                "duration": yt_match["duration"],
+                                "confidence": round(yt_match["score"]),
+                                "liked_for_algorithm": did_like,
+                                "progress": {
+                                    "processed": self.current_state["tracks_processed"],
+                                    "total": self.current_state["tracks_total"],
+                                    "matched": self.current_state["tracks_matched"],
+                                    "missed": self.current_state["tracks_missed"],
+                                    "yt_liked_count": self.current_state["yt_liked_count"]
+                                }
+                            })
+                        else:
+                            self.current_state["tracks_processed"] += 1
+                            self.current_state["tracks_missed"] += 1
+                            self.current_state["missing_tracks"].append({
+                                "playlist": pl_name,
+                                "name": t_name,
+                                "artist": t_artist_str,
+                                "album": t_album,
+                                "platform": "YouTube Music"
+                            })
+                            self._broadcast("yt_missed", {
+                                "platform": "YouTube Music",
+                                "spotify_track": t_name,
+                                "spotify_artist": t_artist_str,
+                                "progress": {
+                                    "processed": self.current_state["tracks_processed"],
+                                    "total": self.current_state["tracks_total"],
+                                    "matched": self.current_state["tracks_matched"],
+                                    "missed": self.current_state["tracks_missed"],
+                                }
+                            })
+
+                    if matched_yt_video_ids and yt_pl_id:
+                        ytmusic_manager.add_tracks(yt_pl_id, matched_yt_video_ids)
 
                 self.current_state["playlists_completed"] += 1
                 self._broadcast("playlist_done", {
                     "playlist_name": pl_name,
-                    "tidal_title": tidal_title,
-                    "tracks_matched": len(matched_track_ids),
+                    "target_title": target_title,
                     "tracks_total": len(tracks)
                 })
 
             self.current_state["status"] = "completed"
             self.current_state["finished_at"] = datetime.now().isoformat()
             self._broadcast("completed", {
-                "message": "¡Todas las playlists seleccionadas fueron transferidas exitosamente!",
+                "message": f"¡Todas las playlists fueron transferidas exitosamente a {dest_label}!",
                 "summary": {
                     "playlists_transferred": self.current_state["playlists_completed"],
                     "tracks_matched": self.current_state["tracks_matched"],
                     "tracks_missed": self.current_state["tracks_missed"],
                     "missing_count": len(self.current_state["missing_tracks"]),
+                    "yt_liked_count": self.current_state["yt_liked_count"],
+                    "algorithm_trained": train_algorithm
                 }
             })
 

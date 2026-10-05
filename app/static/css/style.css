@@ -900,3 +900,40 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }
+
+/* YouTube Music Theme & Algorithmic Booster */
+.ytmusic-card {
+  border-color: rgba(255, 0, 0, 0.2);
+}
+
+.ytmusic-card:hover {
+  border-color: rgba(255, 0, 0, 0.45);
+  box-shadow: 0 10px 30px rgba(255, 0, 0, 0.15);
+}
+
+.btn-ytmusic {
+  background: linear-gradient(135deg, #ff0000, #cc0000);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(255, 0, 0, 0.3);
+}
+
+.btn-ytmusic:hover {
+  background: linear-gradient(135deg, #ff2626, #e60000);
+  box-shadow: 0 6px 20px rgba(255, 0, 0, 0.5);
+  transform: translateY(-1px);
+}
+
+.badge-algorithm {
+  background: rgba(255, 107, 107, 0.15);
+  border: 1px solid rgba(255, 107, 107, 0.35);
+  color: #ff6b6b;
+  font-size: 0.72rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+

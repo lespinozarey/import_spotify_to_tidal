@@ -10,6 +10,7 @@ if ENV_PATH.exists():
     load_dotenv(dotenv_path=ENV_PATH)
 
 TIDAL_SESSION_FILE = BASE_DIR / "tidal_session.json"
+YTMUSIC_SESSION_FILE = BASE_DIR / "ytmusic_session.json"
 SPOTIFY_CACHE_FILE = BASE_DIR / ".spotify_cache"
 
 def get_env_var(key: str, default: str = "") -> str:

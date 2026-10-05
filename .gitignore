@@ -8,6 +8,11 @@ __pycache__/
 
 # Local session and auth caches (NEVER commit or share)
 tidal_session.json
+ytmusic_session.json
+headers_auth.json
+browser_auth.json
+oauth.json
+*ytmusic*.json
 .spotify_cache
 .env
 .env.local
