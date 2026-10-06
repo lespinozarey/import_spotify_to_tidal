@@ -26,6 +26,8 @@ class TransferEngine:
             "tracks_processed": 0,
             "tracks_matched": 0,
             "tracks_missed": 0,
+            "tidal_added_count": 0,
+            "yt_added_count": 0,
             "yt_liked_count": 0,
             "recent_events": [],
             "missing_tracks": [],
@@ -101,6 +103,8 @@ class TransferEngine:
             "tracks_processed": 0,
             "tracks_matched": 0,
             "tracks_missed": 0,
+            "tidal_added_count": 0,
+            "yt_added_count": 0,
             "yt_liked_count": 0,
             "recent_events": [],
             "missing_tracks": [],
@@ -254,94 +258,147 @@ class TransferEngine:
                                 })
 
                     if matched_tidal_ids and tidal_pl:
-                        tidal_manager.add_tracks_to_playlist(tidal_pl, matched_tidal_ids)
+                        self._broadcast("status_update", {
+                            "status": "running",
+                            "message": f"Añadiendo {len(matched_tidal_ids)} temas a TIDAL en '{target_title}'..."
+                        })
+                        try:
+                            added_td = tidal_manager.add_tracks_to_playlist(tidal_pl, matched_tidal_ids)
+                            self.current_state["tidal_added_count"] = self.current_state.get("tidal_added_count", 0) + added_td
+                            self._broadcast("status_update", {
+                                "status": "running",
+                                "message": f"¡{added_td} temas añadidos a TIDAL en '{target_title}'!"
+                            })
+                        except Exception as td_err:
+                            logger.error(f"Error agregando pistas a TIDAL: {td_err}")
+                            self._broadcast("error", {"message": f"Error agregando pistas a TIDAL: {td_err}"})
 
                 # 3. Transfer to YouTube Music if selected
                 if destination in ["ytmusic", "both"]:
                     yt_pl_id = None
                     try:
-                        yt_pl_id = ytmusic_manager.create_playlist(
+                        yt_pl_id = ytmusic_manager.get_or_create_playlist(
                             title=target_title,
                             description=f"{pl_desc} (Migrada con Spotify to TIDAL & YouTube Pro)"
                         )
                     except Exception as e:
-                        logger.error(f"Error creando playlist en YouTube Music '{target_title}': {e}")
-                        self._broadcast("error", {"message": f"No se pudo crear la playlist '{target_title}' en YouTube Music: {e}"})
+                        logger.error(f"Error creando o accediendo a playlist en YouTube Music '{target_title}': {e}")
+                        self._broadcast("error", {"message": f"No se pudo crear o acceder a la playlist '{target_title}' en YouTube Music: {e}. Verifica que tu sesión esté activa."})
 
-                    matched_yt_video_ids = []
-                    for t_idx, track in enumerate(tracks):
-                        if self.should_cancel:
-                            self.current_state["status"] = "cancelled"
-                            self._broadcast("status_update", {"status": "cancelled", "message": "Transferencia cancelada."})
-                            return
+                    if not yt_pl_id:
+                        self._broadcast("error", {
+                            "message": f"Transferencia a YouTube Music omitida para '{pl_name}': No se pudo acceder a la playlist en YouTube Music. Reconecta tu sesión de YouTube Music."
+                        })
+                    else:
+                        matched_yt_video_ids = []
+                        for t_idx, track in enumerate(tracks):
+                            if self.should_cancel:
+                                self.current_state["status"] = "cancelled"
+                                self._broadcast("status_update", {"status": "cancelled", "message": "Transferencia cancelada."})
+                                return
 
-                        t_name = track.get("name", "Desconocido")
-                        t_artists = track.get("artists", [])
-                        t_artist_str = track.get("artist_display", "")
-                        t_dur = track.get("duration_ms")
-                        t_album = track.get("album", "")
+                            t_name = track.get("name", "Desconocido")
+                            t_artists = track.get("artists", [])
+                            t_artist_str = track.get("artist_display", "")
+                            t_dur = track.get("duration_ms")
+                            t_album = track.get("album", "")
 
-                        yt_match = ytmusic_manager.search_track(
-                            name=t_name,
-                            artists=t_artists,
-                            duration_ms=t_dur
-                        )
+                            yt_match = ytmusic_manager.search_track(
+                                name=t_name,
+                                artists=t_artists,
+                                duration_ms=t_dur
+                            )
 
-                        if yt_match:
-                            matched_yt_video_ids.append(yt_match["videoId"])
-                            
-                            # Algorithmic Booster: Rate song as LIKE
-                            did_like = False
-                            if train_algorithm:
-                                did_like = ytmusic_manager.rate_track_like(yt_match["videoId"])
-                                if did_like:
-                                    self.current_state["yt_liked_count"] += 1
+                            if yt_match:
+                                matched_yt_video_ids.append(yt_match["videoId"])
+                                
+                                # Algorithmic Booster: Rate song as LIKE
+                                did_like = False
+                                if train_algorithm:
+                                    did_like = ytmusic_manager.rate_track_like(yt_match["videoId"])
+                                    if did_like:
+                                        self.current_state["yt_liked_count"] += 1
 
-                            self.current_state["tracks_processed"] += 1
-                            self.current_state["tracks_matched"] += 1
-                            self._broadcast("yt_matched", {
-                                "platform": "YouTube Music",
-                                "spotify_track": t_name,
-                                "spotify_artist": t_artist_str,
-                                "matched_track": yt_match["title"],
-                                "matched_artist": yt_match["artist"],
-                                "video_id": yt_match["videoId"],
-                                "thumbnail": yt_match["thumbnail"],
-                                "duration": yt_match["duration"],
-                                "confidence": round(yt_match["score"]),
-                                "liked_for_algorithm": did_like,
-                                "progress": {
-                                    "processed": self.current_state["tracks_processed"],
-                                    "total": self.current_state["tracks_total"],
-                                    "matched": self.current_state["tracks_matched"],
-                                    "missed": self.current_state["tracks_missed"],
-                                    "yt_liked_count": self.current_state["yt_liked_count"]
-                                }
+                                if destination == "ytmusic":
+                                    self.current_state["tracks_processed"] += 1
+                                    self.current_state["tracks_matched"] += 1
+
+                                self._broadcast("yt_matched", {
+                                    "platform": "YouTube Music",
+                                    "spotify_track": t_name,
+                                    "spotify_artist": t_artist_str,
+                                    "matched_track": yt_match["title"],
+                                    "matched_artist": yt_match["artist"],
+                                    "video_id": yt_match["videoId"],
+                                    "thumbnail": yt_match["thumbnail"],
+                                    "duration": yt_match["duration"],
+                                    "confidence": round(yt_match["score"]),
+                                    "liked_for_algorithm": did_like,
+                                    "progress": {
+                                        "processed": self.current_state["tracks_processed"],
+                                        "total": self.current_state["tracks_total"],
+                                        "matched": self.current_state["tracks_matched"],
+                                        "missed": self.current_state["tracks_missed"],
+                                        "yt_liked_count": self.current_state["yt_liked_count"]
+                                    }
+                                })
+                            else:
+                                if destination == "ytmusic":
+                                    self.current_state["tracks_processed"] += 1
+                                    self.current_state["tracks_missed"] += 1
+
+                                self.current_state["missing_tracks"].append({
+                                    "playlist": pl_name,
+                                    "name": t_name,
+                                    "artist": t_artist_str,
+                                    "album": t_album,
+                                    "platform": "YouTube Music"
+                                })
+                                self._broadcast("yt_missed", {
+                                    "platform": "YouTube Music",
+                                    "spotify_track": t_name,
+                                    "spotify_artist": t_artist_str,
+                                    "progress": {
+                                        "processed": self.current_state["tracks_processed"],
+                                        "total": self.current_state["tracks_total"],
+                                        "matched": self.current_state["tracks_matched"],
+                                        "missed": self.current_state["tracks_missed"],
+                                    }
+                                })
+
+                        if matched_yt_video_ids and yt_pl_id:
+                            self._broadcast("status_update", {
+                                "status": "running",
+                                "message": f"Añadiendo {len(matched_yt_video_ids)} temas a YouTube Music en '{target_title}'..."
                             })
-                        else:
-                            self.current_state["tracks_processed"] += 1
-                            self.current_state["tracks_missed"] += 1
-                            self.current_state["missing_tracks"].append({
-                                "playlist": pl_name,
-                                "name": t_name,
-                                "artist": t_artist_str,
-                                "album": t_album,
-                                "platform": "YouTube Music"
-                            })
-                            self._broadcast("yt_missed", {
-                                "platform": "YouTube Music",
-                                "spotify_track": t_name,
-                                "spotify_artist": t_artist_str,
-                                "progress": {
-                                    "processed": self.current_state["tracks_processed"],
-                                    "total": self.current_state["tracks_total"],
-                                    "matched": self.current_state["tracks_matched"],
-                                    "missed": self.current_state["tracks_missed"],
-                                }
-                            })
+                            try:
+                                def on_yt_progress(added, total):
+                                    self._broadcast("status_update", {
+                                        "status": "running",
+                                        "message": f"Añadiendo a YouTube Music: {added}/{total} temas..."
+                                    })
 
-                    if matched_yt_video_ids and yt_pl_id:
-                        ytmusic_manager.add_tracks(yt_pl_id, matched_yt_video_ids)
+                                add_res = ytmusic_manager.add_tracks(
+                                    yt_pl_id,
+                                    matched_yt_video_ids,
+                                    on_progress=on_yt_progress
+                                )
+                                added_cnt = add_res.get("added_count", 0)
+                                self.current_state["yt_added_count"] = self.current_state.get("yt_added_count", 0) + added_cnt
+                                if added_cnt == 0:
+                                    self._broadcast("error", {
+                                        "message": f"No se pudieron añadir temas a YouTube Music en '{target_title}'. Tu sesión expiró o fue rechazada. Reconecta tu cuenta."
+                                    })
+                                else:
+                                    self._broadcast("status_update", {
+                                        "status": "running",
+                                        "message": f"¡{added_cnt} temas añadidos exitosamente a YouTube Music en '{target_title}'!"
+                                    })
+                            except Exception as yt_add_err:
+                                logger.error(f"Error añadiendo canciones a YouTube Music: {yt_add_err}")
+                                self._broadcast("error", {
+                                    "message": f"Fallo al agregar canciones a YouTube Music: {yt_add_err}. La playlist quedó creada pero sin temas. Por favor reconecta YouTube Music."
+                                })
 
                 self.current_state["playlists_completed"] += 1
                 self._broadcast("playlist_done", {
@@ -353,11 +410,13 @@ class TransferEngine:
             self.current_state["status"] = "completed"
             self.current_state["finished_at"] = datetime.now().isoformat()
             self._broadcast("completed", {
-                "message": f"¡Todas las playlists fueron transferidas exitosamente a {dest_label}!",
+                "message": f"¡Todas las playlists fueron procesadas para {dest_label}!",
                 "summary": {
                     "playlists_transferred": self.current_state["playlists_completed"],
                     "tracks_matched": self.current_state["tracks_matched"],
                     "tracks_missed": self.current_state["tracks_missed"],
+                    "tidal_added_count": self.current_state.get("tidal_added_count", 0),
+                    "yt_added_count": self.current_state.get("yt_added_count", 0),
                     "missing_count": len(self.current_state["missing_tracks"]),
                     "yt_liked_count": self.current_state["yt_liked_count"],
                     "algorithm_trained": train_algorithm

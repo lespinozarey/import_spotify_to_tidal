@@ -18,6 +18,11 @@ const el = {
   // Status Badges & Profiles
   spotifyStatusBadge: document.getElementById('spotifyStatusBadge'),
   spotifyStatusText: document.getElementById('spotifyStatusText'),
+  spotifyProfile: document.getElementById('spotifyProfile'),
+  spotifyAvatar: document.getElementById('spotifyAvatar'),
+  spotifyUserName: document.getElementById('spotifyUserName'),
+  spotifyMetaText: document.getElementById('spotifyMetaText'),
+  btnSpotifyLogout: document.getElementById('btnSpotifyLogout'),
   quickSpotifyUrlInput: document.getElementById('quickSpotifyUrlInput'),
   btnQuickLoadSpotify: document.getElementById('btnQuickLoadSpotify'),
   btnOpenMultiUrlModal: document.getElementById('btnOpenMultiUrlModal'),
@@ -140,6 +145,10 @@ function setupEventListeners() {
       onQuickSpotifyLoad();
     }
   });
+
+  if (el.btnSpotifyLogout) {
+    el.btnSpotifyLogout.addEventListener('click', onSpotifyLogout);
+  }
 
   // File Upload (CSV/TXT)
   const fileInput = document.getElementById('filePlaylistInput');
@@ -326,6 +335,18 @@ async function onYTMusicLogout() {
   }
 }
 
+// Spotify Logout
+async function onSpotifyLogout() {
+  if (!confirm('¿Deseas desconectar tu cuenta de Spotify?')) return;
+  try {
+    await fetch('/api/spotify/logout', { method: 'POST' });
+    showNotification('Sesión de Spotify cerrada', 'info');
+    await refreshAppStatus();
+  } catch (err) {
+    console.error('Error cerrando sesión de Spotify:', err);
+  }
+}
+
 // App Status & Services Refresh
 async function refreshAppStatus() {
   try {
@@ -336,6 +357,7 @@ async function refreshAppStatus() {
     state.tidal = data.tidal;
     state.ytmusic = data.ytmusic;
 
+    updateSpotifyUI();
     updateTidalUI();
     updateYTMusicUI();
     await loadPlaylists();
@@ -346,6 +368,50 @@ async function refreshAppStatus() {
   } catch (err) {
     console.error('Error obteniendo estado de la aplicación:', err);
   }
+}
+
+// Spotify UI Updates
+function updateSpotifyUI() {
+  if (!el.spotifyStatusBadge) return;
+  const isAuth = state.spotify && state.spotify.authenticated;
+  const isConfigured = state.spotify && state.spotify.configured;
+
+  if (isAuth && state.spotify.profile) {
+    const p = state.spotify.profile;
+    el.spotifyStatusBadge.className = 'status-badge connected';
+    el.spotifyStatusText.textContent = 'Conectado';
+    if (el.spotifyUserName) el.spotifyUserName.textContent = p.display_name || p.id || 'Usuario Spotify';
+    if (el.spotifyMetaText) {
+      const tier = p.product ? p.product.toUpperCase() : 'Cuenta vinculada';
+      const followers = p.followers ? ` • ${p.followers} seguidores` : '';
+      el.spotifyMetaText.textContent = `${tier}${followers}`;
+    }
+    if (el.btnSpotifyLogout) el.btnSpotifyLogout.style.display = 'inline-flex';
+    if (el.spotifyAvatar) {
+      if (p.avatar) {
+        el.spotifyAvatar.innerHTML = `<img src="${p.avatar}" alt="Spotify Avatar">`;
+      } else {
+        const initial = (p.display_name || 'S').charAt(0).toUpperCase();
+        el.spotifyAvatar.textContent = initial;
+      }
+    }
+  } else if (state.playlists && state.playlists.length > 0) {
+    el.spotifyStatusBadge.className = 'status-badge connected';
+    el.spotifyStatusText.textContent = `${state.playlists.length} listas listas`;
+    if (el.spotifyUserName) el.spotifyUserName.textContent = 'Listas Preparadas';
+    if (el.spotifyMetaText) el.spotifyMetaText.textContent = `${state.playlists.length} playlist(s) listas para migrar`;
+    if (el.btnSpotifyLogout) el.btnSpotifyLogout.style.display = 'none';
+    if (el.spotifyAvatar) el.spotifyAvatar.textContent = 'SP';
+  } else {
+    el.spotifyStatusBadge.className = `status-badge ${isConfigured ? 'connected' : 'disconnected'}`;
+    el.spotifyStatusText.textContent = isConfigured ? 'API Lista' : 'Modo Rápido';
+    if (el.spotifyUserName) el.spotifyUserName.textContent = 'Spotify';
+    if (el.spotifyMetaText) el.spotifyMetaText.textContent = 'Pega cualquier enlace público o tu perfil';
+    if (el.btnSpotifyLogout) el.btnSpotifyLogout.style.display = 'none';
+    if (el.spotifyAvatar) el.spotifyAvatar.textContent = 'SP';
+  }
+
+  updateBottomDock();
 }
 
 // YouTube Music UI Updates
@@ -362,7 +428,7 @@ function updateYTMusicUI() {
     el.btnConnectYTMusic.textContent = 'Reconectar';
     el.btnYTMusicLogout.style.display = 'inline-flex';
     if (p.photo) {
-      el.ytmusicAvatar.innerHTML = `<img src="${p.photo}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+      el.ytmusicAvatar.innerHTML = `<img src="${p.photo}" alt="YouTube Music Avatar">`;
     } else {
       el.ytmusicAvatar.textContent = (p.name || 'Y').charAt(0).toUpperCase();
     }
@@ -389,7 +455,12 @@ function updateTidalUI() {
     el.tidalMetaText.textContent = p.email ? `${p.email} • HiFi / MAX` : 'Sesión activa en Tidal';
     el.btnConnectTidal.textContent = 'Reconectar TIDAL';
     el.btnTidalLogout.style.display = 'inline-flex';
-    el.tidalAvatar.textContent = (p.name || 'T').charAt(0).toUpperCase();
+    if (p.photo) {
+      el.tidalAvatar.innerHTML = `<img src="${p.photo}" alt="Tidal Avatar">`;
+    } else {
+      const initial = (p.name || p.username || 'T').charAt(0).toUpperCase();
+      el.tidalAvatar.textContent = initial;
+    }
   } else {
     el.tidalUserName.textContent = 'No conectado';
     el.tidalMetaText.textContent = 'Conexión oficial en 1 clic sin claves de desarrollador';
@@ -609,6 +680,7 @@ async function loadPlaylists() {
         }
       }
       renderPlaylists();
+      updateSpotifyUI();
     }
   } catch (err) {
     console.error('Error cargando playlists:', err);
@@ -923,29 +995,44 @@ function handleTransferEvent(payload) {
       el.btnViewReport.textContent = `Ver ${data.summary.missing_count} canciones faltantes`;
     }
 
-    el.tickerSong.textContent = '¡Proceso terminado con éxito!';
+    el.tickerSong.textContent = '¡Proceso terminado!';
     const summary = data.summary || {};
-    let summaryText = `Se transfirieron ${summary.tracks_matched || 0} canciones.`;
+    let summaryParts = [];
+    if (summary.tidal_added_count > 0) {
+      summaryParts.push(`TIDAL: ${summary.tidal_added_count} añadidos`);
+    }
+    if (summary.yt_added_count > 0) {
+      summaryParts.push(`YouTube Music: ${summary.yt_added_count} añadidos`);
+    }
+    if (summaryParts.length === 0) {
+      summaryParts.push(`${summary.tracks_matched || 0} canciones emparejadas`);
+    }
+    let summaryText = summaryParts.join(' • ');
     if (summary.yt_liked_count > 0) {
-      summaryText += ` 🔥 Se asignaron ${summary.yt_liked_count} 'Me Gusta' para entrenar el algoritmo de YouTube.`;
+      summaryText += ` 🔥 ${summary.yt_liked_count} Likes`;
     }
     el.tickerArtist.textContent = summaryText;
-    appendFeedItem('🎉 ¡Proceso finalizado! Revisa tu biblioteca en TIDAL o YouTube Music.', 'isrc');
+    appendFeedItem(`🎉 ¡Finalizado! ${summaryText}`, 'isrc');
 
     if (state.eventSource) {
       state.eventSource.close();
     }
   }
 
-  else if (ev === 'status_update' && data.status === 'cancelled') {
-    el.transferModalTitle.textContent = 'Transferencia Detenida';
-    el.eqAnim.style.display = 'none';
-    el.btnCancelTransfer.style.display = 'none';
-    el.btnCloseTransferModal.style.display = 'inline-flex';
-    el.tickerSong.textContent = 'Proceso cancelado por el usuario';
-    appendFeedItem('Operación cancelada.', 'missed');
-    if (state.eventSource) {
-      state.eventSource.close();
+  else if (ev === 'status_update') {
+    if (data.status === 'cancelled') {
+      el.transferModalTitle.textContent = 'Transferencia Detenida';
+      el.eqAnim.style.display = 'none';
+      el.btnCancelTransfer.style.display = 'none';
+      el.btnCloseTransferModal.style.display = 'inline-flex';
+      el.tickerSong.textContent = 'Proceso cancelado por el usuario';
+      appendFeedItem('Operación cancelada.', 'missed');
+      if (state.eventSource) {
+        state.eventSource.close();
+      }
+    } else if (data.message) {
+      el.tickerArtist.textContent = data.message;
+      appendFeedItem(data.message, 'fuzzy', 'INFO');
     }
   }
 

@@ -129,12 +129,21 @@ class TidalManager:
         if not name:
             name = getattr(user, "username", "Usuario de Tidal")
 
+        picture_id = getattr(user, "picture_id", None)
+        photo = None
+        if picture_id:
+            try:
+                photo = user.image(100)
+            except Exception:
+                photo = f"https://resources.tidal.com/images/{picture_id.replace('-', '/')}/160x160.jpg"
+
         return {
             "id": getattr(user, "id", None),
             "username": getattr(user, "username", ""),
             "name": name,
             "email": getattr(user, "email", ""),
-            "picture": getattr(user, "picture_id", None),
+            "picture": picture_id,
+            "photo": photo,
         }
 
     def match_track(

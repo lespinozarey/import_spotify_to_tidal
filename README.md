@@ -123,12 +123,49 @@ Tienes 3 alternativas:
 
 ---
 
-## 🛠️ Tecnologías Utilizadas
+## 🏛️ Arquitectura y Tecnologías
 
-- **Backend**: [FastAPI](https://fastapi.tiangolo.com/), [Uvicorn](https://www.uvicorn.org/), Python 3.10+
-- **Integraciones de Audio**: [tidalapi](https://github.com/tamland/python-tidal), [ytmusicapi](https://github.com/sigma67/ytmusicapi), [spotipy](https://spotipy.readthedocs.io/)
-- **Emparejamiento Inteligente**: [RapidFuzz](https://github.com/maxbachmann/RapidFuzz)
-- **Frontend**: HTML5 Semántico, CSS3 Moderno (Glassmorphism, Dark Theme), Vanilla JavaScript (Reactivo con SSE)
+La aplicación está diseñada siguiendo principios de simplicidad operativa, cero fricción de dependencias y alto rendimiento concurrente para transferencias de gran volumen.
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                      Frontend SPA (Vanilla JS / CSS)                   │
+│   • Estado Reactivo en Memoria        • Streaming SSE (EventSource)    │
+│   • Diálogos Nativos (<dialog>)       • UI Glassmorphism Dark Mode     │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ HTTP REST + SSE Stream (/events)
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                       FastAPI Backend (Python 3.10+)                   │
+│   ┌───────────────────────────────┴────────────────────────────────┐   │
+│   │  Bucle Asíncrono Principal (asyncio Event Loop / ASGI)         │   │
+│   │  • Endpoints REST / Pydantic DTOs                              │   │
+│   │  • Broker de Eventos SSE (asyncio.Queue por suscriptor)        │   │
+│   └───────────────────────────────┬────────────────────────────────┘   │
+│                                   │ loop.call_soon_threadsafe()        │
+│   ┌───────────────────────────────▼────────────────────────────────┐   │
+│   │  Worker de Transferencia en Hilo Dedicado (threading.Thread)   │   │
+│   │  • Ejecución secuencial y aislada de I/O bloqueante            │   │
+│   │  • Manejo de cancelaciones y estado de progreso atómico        │   │
+│   └───────┬───────────────────────┬────────────────────────┬───────┘   │
+└───────────┼───────────────────────┼────────────────────────┼───────────┘
+            │                       │                        │
+┌───────────▼───────────┐ ┌─────────▼───────────┐ ┌──────────▼───────────┐
+│     Spotify Extractor │ │     TIDAL Client    │ │   YT Music Client    │
+│ • Embed Scraper JSON  │ │ • OAuth Device Flow │ │ • Browser Headers    │
+│ • Spotipy OAuth       │ │ • ISRC Priority     │ │ • Batch / Fallback   │
+│ • Parser CSV / TXT    │ │ • RapidFuzz Matcher │ │ • Reutilización Auto │
+└───────────────────────┘ └─────────────────────┘ └──────────────────────┘
+```
+
+### Pilares de Ingeniería
+- **Backend Concurrente Híbrido (`asyncio` + `threading.Thread`)**: Servido con [FastAPI](https://fastapi.tiangolo.com/) y [Uvicorn](https://www.uvicorn.org/). Las librerías de clientes de audio (`tidalapi`, `ytmusicapi`) utilizan llamadas HTTP síncronas bloqueantes; para evitar congelar el bucle ASGI de FastAPI, el motor de transferencia corre en un hilo secundario y despacha eventos en tiempo real mediante `loop.call_soon_threadsafe()`.
+- **Frontend SPA Reactivo sin dependencias de Node**: Construido con Vanilla JavaScript y CSS3 moderno (Glassmorphism, Dark Mode). Sin `npm`, sin `node_modules` ni bundlers; arranque instantáneo.
+- **Streaming en Tiempo Real con Server-Sent Events (SSE)**: Comunicación unidireccional backend-hacia-frontend mediante la API nativa del navegador `EventSource('/api/transfer/events')`, mucho más liviana y estable que WebSockets para telemetría de progreso.
+- **Extracción de Spotify Zero-Config**: Scraping de alta velocidad del JSON embebido en `open.spotify.com/embed` (`<script id="__NEXT_DATA__">`) que permite transferir playlists públicas sin requerir que el usuario configure credenciales de desarrollador en Spotify.
+- **Fuzzy Matching Ponderado ([RapidFuzz](https://github.com/maxbachmann/RapidFuzz))**: Limpieza de ruido en títulos (`Remaster`, `Live`, etc.), prioridad por código ISRC universal, ratio de coincidencia ponderado (65% título / 35% artista) y penalización por discrepancia en duración.
+- **Resiliencia en APIs de Destino**: Reutilización automática de playlists vacías previamente creadas, inserción en bloques de 50 temas con fallback unitario ante tracks restringidos por región, y rate limiting preventivo.
+
+> 📖 **Para desarrolladores:** Puedes consultar el análisis técnico detallado, los diagramas de secuencia y la justificación de diseño completa en el documento [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 

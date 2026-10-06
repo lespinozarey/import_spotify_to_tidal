@@ -41,6 +41,15 @@
           </div>
         </div>
 
+        <div class="service-profile" id="spotifyProfile" style="margin-bottom: 1.2rem;">
+          <div class="profile-avatar" id="spotifyAvatar" style="background: linear-gradient(135deg, #1db954, #127a36); color: #fff;">SP</div>
+          <div class="profile-info" style="flex:1;">
+            <h4 id="spotifyUserName">Modo Enlace Rápido</h4>
+            <p id="spotifyMetaText">Pega cualquier enlace público o inicia sesión con tu cuenta</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="btnSpotifyLogout" style="display:none; font-size:0.75rem; color:#ff6b6b; padding:0.3rem 0.6rem;">Desconectar</button>
+        </div>
+
         <div style="margin-bottom: 1.2rem;">
           <label style="display:block; font-size:0.85rem; font-weight:600; color:var(--text-muted); margin-bottom:0.4rem;">
             Pega el enlace de tu playlist o perfil de Spotify:
@@ -395,22 +404,26 @@
     </div>
     
     <div class="help-box" style="background:rgba(255,0,0,0.06); border-color:rgba(255,0,0,0.25);">
-      <strong style="color:#ff6b6b;">¿Cómo conectar tu cuenta para entrenar el algoritmo?</strong>
+      <strong style="color:#ff6b6b;">¿Cómo conectar tu cuenta de YouTube Music?</strong>
       <p style="margin-top:0.3rem; font-size:0.82rem; color:var(--text-muted);">
-        Para transferir sin límites de cuota y dar "Me Gusta" automático en YouTube Music:
+        Para transferir sin límites de cuota, crear playlists y dar "Me Gusta" automático en YouTube Music:
       </p>
       <ol style="margin-left: 1.2rem; margin-top: 0.5rem; font-size:0.82rem; line-height:1.6;">
-        <li>Abre <a href="https://music.youtube.com" target="_blank" rel="noopener" style="color:#ff6b6b; text-decoration:underline;">music.youtube.com</a> en Chrome o Edge con tu cuenta iniciada.</li>
-        <li>Presiona <kbd>F12</kbd> (o clic derecho > <em>Inspeccionar</em>) y ve a la pestaña <strong>Red (Network)</strong>.</li>
-        <li>Filtra por <code>browse</code>, haz clic derecho sobre esa petición > <strong>Copiar > Copiar cabeceras de solicitud (Copy request headers)</strong>.</li>
-        <li>Pega el texto copiado en el recuadro de abajo.</li>
+        <li>Abre <a href="https://music.youtube.com" target="_blank" rel="noopener" style="color:#ff6b6b; text-decoration:underline; font-weight:600;">music.youtube.com</a> en Chrome o Edge (asegúrate de que tu foto de perfil aparezca arriba a la derecha).</li>
+        <li>Presiona <kbd>F12</kbd> (o clic derecho ➔ <em>Inspeccionar</em>) y ve a la pestaña <strong>Red (Network)</strong>.</li>
+        <li>Haz clic en cualquier playlist o canción en la página (o filtra por <code>browse</code> en Network).</li>
+        <li>Haz clic derecho sobre esa petición (ej: <code>browse</code>) ➔ <strong>Copiar ➔ Copiar cabeceras de solicitud (Copy request headers)</strong> o <em>Copiar como cURL</em>.</li>
+        <li>Pégalo en el recuadro de abajo y dale a <strong>Conectar</strong>.</li>
       </ol>
+      <div style="background:rgba(0,0,0,0.2); border-radius:6px; padding:0.5rem; margin-top:0.5rem; font-size:0.77rem; color:#fca5a5;">
+        💡 <strong>¿Se te creó una playlist vacía?</strong> Google expira los códigos temporales de sesión por seguridad. Con solo reconectar aquí con cabeceras frescas y volver a iniciar la transferencia a YouTube Music, el sistema <strong>detectará automáticamente tu playlist vacía existente</strong> y la rellenará con todos los temas sin duplicados.
+      </div>
     </div>
 
     <form id="ytmusicConnectForm">
       <div class="form-group">
         <label for="ytmusicHeadersInput" style="font-size:0.85rem; font-weight:600;">Cabeceras o Cookie de YouTube Music:</label>
-        <textarea class="form-input" id="ytmusicHeadersInput" rows="6" placeholder="Pega aquí las cabeceras de la petición (o tus cookies de music.youtube.com)..." style="font-family: monospace; font-size: 0.78rem; resize: vertical;"></textarea>
+        <textarea class="form-input" id="ytmusicHeadersInput" rows="6" placeholder="Pega aquí las cabeceras de la petición copiadas desde Network..." style="font-family: monospace; font-size: 0.78rem; resize: vertical;"></textarea>
       </div>
       <div id="ytmusicConnectError" style="color:#ff4e45; font-size:0.82rem; margin-bottom:0.75rem; display:none;"></div>
       <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
